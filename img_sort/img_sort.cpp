@@ -149,6 +149,7 @@ namespace img_sort {
             heap.emplace(src, dst, p.second);
         }
 
+        // Prim's
         while (t.num_edges() + 1 < size) {
             pq_entry curr = heap.top();
             heap.pop();
@@ -240,8 +241,10 @@ int main(int argc, const char** argv) {
 
     std::vector<img_sort::histogram> histograms(filenames.size());
     {
-        std::transform(img_sort::execution_policy, filenames.begin(), filenames.end(), histograms.begin(),
-            [](const auto &f) { return img_sort::histogram{ img_sort::calculate_histogram(f), f }; });
+        logger::benchmark([&]() {
+            std::transform(img_sort::execution_policy, filenames.begin(), filenames.end(), histograms.begin(),
+                [](const auto &f) { return img_sort::histogram{ img_sort::calculate_histogram(f), f }; });
+        });
 
         auto new_end = std::partition(histograms.begin(), histograms.end(), [](const auto &h) { return !h.mat.empty(); });
         histograms.erase(new_end, histograms.end());
@@ -272,7 +275,8 @@ int main(int argc, const char** argv) {
             res = img_sort::compute_histogram_diff(histograms[x], histograms[y]);
         };
 
-        std::for_each(img_sort::execution_policy, diff_table.begin(), diff_table.end(), compute_diff);
+        logger::benchmark([&]() { std::for_each(img_sort::execution_policy, diff_table.begin(), diff_table.end(), compute_diff); });
+        // Reduce memory footprint
         std::for_each(img_sort::execution_policy, histograms.begin(), histograms.end(), [](auto &h) { h.clear(); });
     }
 
@@ -281,14 +285,17 @@ int main(int argc, const char** argv) {
     //
 
     logger::post<logger::info>("Computing MST...");
-    const img_sort::tree mst = img_sort::compute_mst(histograms.size(), diff_table);
+    const img_sort::tree mst = logger::benchmark([&]() { return img_sort::compute_mst(histograms.size(), diff_table); });
+
+    // Reduce memory footprint
+    diff_table.clear();
 
     //
     // Perform traversal
     //
 
     logger::post<logger::info>("Generating sort order...");
-    const auto sort_order_opt = img_sort::pre_order(mst);
+    const auto sort_order_opt = logger::benchmark([&]() { return img_sort::pre_order(mst); });
     if (!sort_order_opt) return -1;
 
     //

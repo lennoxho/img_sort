@@ -18,7 +18,8 @@ namespace img_sort {
             info,
             warning,
             error,
-            fatal
+            fatal,
+            profile
         };
 
         template <type T, typename... S>
@@ -38,20 +39,48 @@ namespace img_sort {
             }
         }
 
+        template <typename Func>
+        static decltype(auto) benchmark(Func &&func) {
+            struct print_stats_ {
+                std::chrono::time_point<std::chrono::steady_clock> start;
+
+                print_stats_() {
+                    start = std::chrono::steady_clock::now();
+                }
+
+                ~print_stats_() {
+                    auto end = std::chrono::steady_clock::now();
+                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+                    if (elapsed < 1'000) {
+                        post<profile>(elapsed, "ms");
+                    }
+                    else {
+                        post<profile>(elapsed / 1'000, 's');
+                    }
+                }
+            } print_stats;
+
+            return std::forward<Func>(func)();
+        }
+
     private:
         template <type T>
         static constexpr std::string_view type_string() {
             if constexpr (T == type::info) {
-                return "Info        : ";
+                return "Info         : ";
             }
             else if constexpr (T == type::warning) {
-                return "Warning     : ";
+                return "Warning      : ";
             }
             else if constexpr (T == type::error) {
-                return "Error       : ";
+                return "Error        : ";
             }
             else if constexpr (T == type::fatal) {
-                return "Fatal Error : ";
+                return "Fatal Error  : ";
+            }
+            else if constexpr (T == type::profile) {
+                return "Time Elapsed : ";
             }
             else {
                 throw std::runtime_error("Unrecognised type enum!");
@@ -167,6 +196,11 @@ namespace img_sort {
             return boost::irange<std::size_t>(0, m_width)
                 | boost::adaptors::filtered([y](auto x) { return x != y; })
                 | boost::adaptors::transformed(func);
+        }
+
+        void clear() {
+            m_data.clear();
+            m_width = 0;
         }
     };
 

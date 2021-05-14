@@ -1,0 +1,5 @@
+*.pdb
+x64/Release/img_sort.tlog/link.write.1.tlog
+*.tlog
+x64/Release/img_sort.log
+*.obj
