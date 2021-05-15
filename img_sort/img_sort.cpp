@@ -44,37 +44,42 @@ namespace img_sort {
     };
 
     class tree {
-        static constexpr auto no_parent = std::numeric_limits<std::size_t>::max();
-
-        std::vector<std::size_t> m_parent;
+#ifndef NDEBUG
+        std::vector<bool> m_parent;
+#endif
         std::vector<boost::container::small_vector<std::size_t, 1>> m_adjacency_list;
         std::size_t m_num_edges = 0;
 
     public:
         tree(std::size_t size)
-            :m_parent(size, no_parent),
-            m_adjacency_list(size)
+            :m_adjacency_list(size)
         {
             RUNTIME_ASSERT(size > 0);
+#ifndef NDEBUG
+            m_parent.assign(size, false);
+#endif
         }
 
         bool try_insert(std::size_t parent, std::size_t child) {
             RUNTIME_ASSERT(parent < m_adjacency_list.size());
+            
+#ifndef NDEBUG
             RUNTIME_ASSERT(child < m_parent.size());
-
             if (contains(child)) {
                 return false;
             }
-
-            m_parent[child] = parent;
+            m_parent[child] = true;
+#endif
             m_adjacency_list[parent].emplace_back(child);
             ++m_num_edges;
             return true;
         }
 
+#ifndef NDEBUG
         bool contains(std::size_t node) const {
-            return node == 0 || m_parent[node] != no_parent;
+            return node == 0 || m_parent[node];
         }
+#endif
 
         auto &children(std::size_t node) const {
             RUNTIME_ASSERT(node < m_adjacency_list.size());
@@ -125,43 +130,48 @@ namespace img_sort {
 
     template <typename T>
     tree compute_mst(std::size_t size, const triangular_table<T> &weights) {
+        RUNTIME_ASSERT(size >= 2);
         tree t{ size };
-        
+
         struct pq_entry {
             std::size_t source;
             std::size_t destination;
-            T weight;
-
-            pq_entry(std::size_t src, std::size_t dst, T w)
-                :source{ src },
-                destination{ dst },
-                weight{ w }
-            {}
-
-            bool operator<(const pq_entry &other) const noexcept {
-                return weight > other.weight;
-            }
+            T cost = std::numeric_limits<T>::max();
         };
 
-        std::priority_queue<pq_entry> heap;
-        for (const auto &p : weights.row(0)) {
-            auto [dst, src] = p.first;
-            heap.emplace(src, dst, p.second);
+        std::vector<pq_entry> candidates(size);
+        for (std::size_t i = 0; i < size; ++i) {
+            candidates[i].destination = i;
         }
 
-        // Prim's
-        while (t.num_edges() + 1 < size) {
-            pq_entry curr = heap.top();
-            heap.pop();
+        const pq_entry dummy_entry;
+        const auto final_num_edges = size - 1;
+        std::size_t just_inserted_index = 0;
+        std::size_t just_inserted = 0;
 
-            if (t.try_insert(curr.source, curr.destination)) {
-                for (const auto &p : weights.row(curr.destination)) {
-                    auto [dst, src] = p.first;
-                    if (!t.contains(dst)) {
-                        heap.emplace(src, dst, p.second);
-                    }
+        while (t.num_edges() < final_num_edges) {
+            std::swap(candidates[just_inserted_index], candidates[candidates.size() - 1]);
+            candidates.pop_back();
+
+            const pq_entry* min_entry = &dummy_entry;
+
+            // Might be interesting to parallelise for large size
+            for (auto &curr_candidate : candidates) {
+                const auto cost_to_just_inserted = weights(just_inserted, curr_candidate.destination);
+                if (cost_to_just_inserted <= curr_candidate.cost) {
+                    curr_candidate.source = just_inserted;
+                    curr_candidate.cost = cost_to_just_inserted;
+                }
+
+                if (cost_to_just_inserted <= min_entry->cost) {
+                    min_entry = &curr_candidate;
                 }
             }
+
+            bool insert_result = t.try_insert(min_entry->source, min_entry->destination);
+            RUNTIME_ASSERT(insert_result);
+            just_inserted_index = min_entry - candidates.data();
+            just_inserted = min_entry->destination;
         }
 
         return t;
