@@ -25,6 +25,8 @@ namespace img_sort {
         template <type T, typename... S>
         static void post(const S&... msg) {
             constexpr auto prefix = type_string<T>();
+            static std::mutex mtx;
+            std::lock_guard lock{ mtx };
 
             std::ostream* os = &std::cout;
             if constexpr (T == fatal) {
@@ -86,8 +88,6 @@ namespace img_sort {
                 throw std::runtime_error("Unrecognised type enum!");
             }
         }
-
-        std::mutex mtx;
     };
 
     template <typename T>

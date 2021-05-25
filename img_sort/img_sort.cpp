@@ -208,11 +208,17 @@ int main(int argc, const char** argv) {
         return -1;
     }
 
+    const auto source_directory = std::filesystem::path{ argv[1] };
+    const auto output_directory = std::filesystem::path{ argv[2] };
+    if (std::filesystem::equivalent(source_directory, output_directory)) {
+        logger::post<logger::error>("Source and destination directories and equivalent!");
+        return -1;
+    }
+
     //
     // listdir
     //
 
-    const auto source_directory = std::filesystem::path{ argv[1] };
     if (!std::filesystem::is_directory(source_directory)) {
         logger::post<logger::error>(source_directory, " is not a directory");
         return -1;
@@ -312,7 +318,6 @@ int main(int argc, const char** argv) {
     // Create symlinks in output directory
     //
 
-    const auto output_directory = std::filesystem::path{ argv[2] };
     logger::post<logger::info>("Populating output directory ", output_directory, "...");
     std::filesystem::create_directories(output_directory);
 
